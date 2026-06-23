@@ -1,16 +1,14 @@
 import os
+import subprocess
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
-from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from PyPDF2 import PdfMerger, PdfReader, PdfWriter
 from pdf2docx import Converter
-import pdfkit
 
 app = Flask(__name__)
 CORS(app)
 
-# 1. تحويل Word إلى PDF
+# 1. تحويل Word إلى PDF (باستخدام محرك LibreOffice الحقيقي لضمان التنسيق 100%)
 @app.route('/convert/office-to-pdf', methods=['POST'])
 def office_to_pdf():
     if 'file' not in request.files:
@@ -21,70 +19,34 @@ def office_to_pdf():
         return jsonify({"error": "No filename"}), 400
 
     docx_path = "temp.docx"
-    html_path = "temp.html"
-    pdf_path = "output.pdf"
     file.save(docx_path)
 
     try:
-        doc = Document(docx_path)
-        html_content = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <style>
-                @page { size: A4; margin: 15mm; }
-                body { 
-                    font-family: 'KacstOne', 'Arial', sans-serif; 
-                    direction: rtl; 
-                    text-align: right; 
-                    line-height: 1.8;
-                    font-size: 14pt;
-                }
-                .align-center { text-align: center; }
-                .align-left { text-align: left; }
-                .align-right { text-align: right; }
-                .bold { font-weight: bold; }
-            </style>
-        </head>
-        <body>
-        """
-        for paragraph in doc.paragraphs:
-            text = paragraph.text.strip()
-            if not text:
-                html_content += "<br>"
-                continue
-            
-            align_class = "align-right"
-            if paragraph.alignment == WD_ALIGN_PARAGRAPH.CENTER:
-                align_class = "align-center"
-            elif paragraph.alignment == WD_ALIGN_PARAGRAPH.LEFT:
-                align_class = "align-left"
-
-            p_html = ""
-            for run in paragraph.runs:
-                style = f"font-size: {run.font.size.pt if run.font.size else 14}pt;"
-                if run.font.color and run.font.color.rgb:
-                    style += f"color: #{run.font.color.rgb};"
-                
-                cls = "class='bold'" if run.bold else ""
-                p_html += f"<span {cls} style='{style}'>{run.text}</span>"
-            
-            html_content += f"<div class='{align_class}'>{p_html}</div>"
+        # أمر تشغيل المحرك لتحويل الملف فوراً وبنفس الأبعاد والزخارف والأشكال
+        cmd = [
+            'soffice',
+            '--headless',
+            '--convert-to', 'pdf',
+            docx_path
+        ]
         
-        html_content += "</body></html>"
+        # تشغيل الأمر وانتظار انتهائه
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        # اسم الملف الناتج التلقائي من المحرك
+        pdf_path = "temp.pdf"
+        
+        if os.path.exists(pdf_path):
+            return send_file(pdf_path, as_attachment=True, download_name="converted.pdf")
+        else:
+            return jsonify({"error": f"Conversion failed: {result.stderr}"}), 500
 
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(html_content)
-
-        options = {'encoding': "UTF-8", 'quiet': '', 'enable-local-file-access': ''}
-        pdfkit.from_file(html_path, pdf_path, options=options)
-        return send_file(pdf_path, as_attachment=True)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
-        for path in [docx_path, html_path]:
-            if os.path.exists(path): os.remove(path)
+        # تنظيف الملفات المؤقتة
+        if os.path.exists(docx_path): os.remove(docx_path)
+        if os.path.exists("temp.pdf"): os.remove("temp.pdf")
 
 # 2. تحويل PDF إلى Word
 @app.route('/convert/pdf-to-word', methods=['POST'])
