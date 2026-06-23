@@ -26,7 +26,7 @@ def office_to_pdf():
     try:
         doc = Document(docx_path)
         
-        # بناء هيكل HTML متطور يدعم التنسيقات والأحجام والزخارف والألوان
+        # بناء هيكل HTML متطور يدعم التنسيقات والأحجام والتوسيط
         html_content = """
         <!DOCTYPE html>
         <html>
@@ -35,9 +35,6 @@ def office_to_pdf():
             <style>
                 @page {
                     margin: 20mm;
-                    @border {
-                        border: 2px double #333; /* إضافة إطار وزخرفة لصفحة الـ PDF */
-                    }
                 }
                 body { 
                     font-family: 'KacstOne', 'Arial', sans-serif; 
@@ -58,10 +55,10 @@ def office_to_pdf():
         for paragraph in doc.paragraphs:
             text = paragraph.text.strip()
             if not text:
-                html_content += "<br>" # الحفاظ على الفراغات والأسطر الفارغة
+                html_content += "<br>" # الحفاظ على الأسطر الفارغة والفراغات
                 continue
                 
-            # معرفة اتجاه ومكان النص (يمين، يسار، وسط) الحقيقي في ملف الوورد
+            # تحديد محاذاة النص (وسط، يمين، يسار)
             align_class = "align-right"
             if paragraph.alignment == WD_ALIGN_PARAGRAPH.CENTER:
                 align_class = "align-center"
@@ -70,7 +67,6 @@ def office_to_pdf():
             elif paragraph.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY:
                 align_class = "align-justify"
 
-            # قراءة التنسيقات التفصيلية داخل السطر الواحد (الحجم، البولد، الألوان)
             p_html = ""
             for run in paragraph.runs:
                 run_style = ""
@@ -79,10 +75,9 @@ def office_to_pdf():
                 if run.italic:
                     run_style += "font-style: italic;"
                 if run.font.size:
-                    # تحويل حجم الخط من مقياس الوورد إلى مقياس الويب pt
                     run_style += f"font-size: {run.font.size.pt}pt;"
                 else:
-                    run_style += "font-size: 14pt;" # الحجم الافتراضي الفخم للنصوص العربية
+                    run_style += "font-size: 14pt;" # حجم الخط الافتراضي
 
                 if run.font.color and run.font.color.rgb:
                     run_style += f"color: #{run.font.color.rgb};"
@@ -93,19 +88,19 @@ def office_to_pdf():
         
         html_content += "</body></html>"
 
-        # حفظ ملف HTML المؤقت بالترميز العربي الصحيح
+        # حفظ ملف HTML المؤقت
         with open(html_path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
-        # إعدادات أداة التحويل لضمان تفعيل الخطوط والزخارف بالشكل الكامل
+        # الإعدادات النظيفة والصحيحة 100% للأداة بدون أي فلسفة زيادة
         options = {
             'encoding': "UTF-8",
             'quiet': '',
             'enable-local-file-access': '',
-            'margins-history': '',
             'page-size': 'A4'
         }
         
+        # تحويل الملف
         pdfkit.from_file(html_path, pdf_path, options=options)
 
         return send_file(pdf_path, as_attachment=True)
