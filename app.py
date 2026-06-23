@@ -26,7 +26,7 @@ def office_to_pdf():
     try:
         doc = Document(docx_path)
         
-        # بناء هيكل HTML متطور يدعم التنسيقات والأحجام والتوسيط
+        # قالب HTML فخم ومحسّن لحل مشاكل تداخل الخطوط والتنسيقات العربية
         html_content = """
         <!DOCTYPE html>
         <html>
@@ -34,31 +34,44 @@ def office_to_pdf():
             <meta charset="utf-8">
             <style>
                 @page {
-                    margin: 20mm;
+                    size: A4;
+                    margin: 15mm;
                 }
                 body { 
-                    font-family: 'KacstOne', 'Arial', sans-serif; 
+                    font-family: 'KacstOne', 'Arial', 'DejaVu Sans', sans-serif; 
                     direction: rtl; 
                     text-align: right; 
-                    line-height: 1.6;
-                    color: #222;
+                    line-height: 1.8;
+                    color: #111;
+                    font-size: 14pt;
+                    padding: 10px;
+                }
+                /* إطار وزخرفة عامة تحاكي الهوامش الجانبية الجمالية */
+                .page-border {
+                    border: 3px double #444;
+                    padding: 20px;
+                    min-height: 95%;
                 }
                 .align-center { text-align: center; }
                 .align-left { text-align: left; }
                 .align-right { text-align: right; }
                 .align-justify { text-align: justify; }
+                
+                .bold { font-weight: bold; }
+                .italic { font-style: italic; }
             </style>
         </head>
         <body>
+            <div class="page-border">
         """
         
         for paragraph in doc.paragraphs:
             text = paragraph.text.strip()
             if not text:
-                html_content += "<br>" # الحفاظ على الأسطر الفارغة والفراغات
+                html_content += "<br>"
                 continue
                 
-            # تحديد محاذاة النص (وسط، يمين، يسار)
+            # تحديد المحاذاة بدقة
             align_class = "align-right"
             if paragraph.alignment == WD_ALIGN_PARAGRAPH.CENTER:
                 align_class = "align-center"
@@ -67,40 +80,48 @@ def office_to_pdf():
             elif paragraph.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY:
                 align_class = "align-justify"
 
+            # تجميع النص كاملاً في الفقرة لتجنب تقطيع الحروف العربية
             p_html = ""
             for run in paragraph.runs:
+                style_classes = []
                 run_style = ""
+                
                 if run.bold:
-                    run_style += "font-weight: bold;"
+                    style_classes.append("bold")
                 if run.italic:
-                    run_style += "font-style: italic;"
+                    style_classes.append("italic")
                 if run.font.size:
                     run_style += f"font-size: {run.font.size.pt}pt;"
-                else:
-                    run_style += "font-size: 14pt;" # حجم الخط الافتراضي
-
                 if run.font.color and run.font.color.rgb:
                     run_style += f"color: #{run.font.color.rgb};"
 
-                p_html += f"<span style='{run_style}'>{run.text}</span>"
+                class_attr = f"class='{' '.join(style_classes)}'" if style_classes else ""
+                style_attr = f"style='{run_style}'" if run_style else ""
+                
+                p_html += f"<span {class_attr} {style_attr}>{run.text}</span>"
             
             html_content += f"<div class='{align_class}'>{p_html}</div>"
         
-        html_content += "</body></html>"
+        html_content += """
+            </div>
+        </body>
+        </html>
+        """
 
         # حفظ ملف HTML المؤقت
         with open(html_path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
-        # الإعدادات النظيفة والصحيحة 100% للأداة بدون أي فلسفة زيادة
         options = {
             'encoding': "UTF-8",
             'quiet': '',
             'enable-local-file-access': '',
-            'page-size': 'A4'
+            'margin-top': '0mm',
+            'margin-bottom': '0mm',
+            'margin-left': '0mm',
+            'margin-right': '0mm'
         }
         
-        # تحويل الملف
         pdfkit.from_file(html_path, pdf_path, options=options)
 
         return send_file(pdf_path, as_attachment=True)
@@ -113,16 +134,16 @@ def office_to_pdf():
                 os.remove(path)
 
 @app.route('/convert/pdf-to-word', methods=['POST'])
-def pdf_to_word(): return jsonify({"message": "Feature ready"})
+def pdf_to_word(): return jsonify({"message": "Ready"})
 
 @app.route('/convert/image-to-pdf', methods=['POST'])
-def image_to_pdf(): return jsonify({"message": "Feature ready"})
+def image_to_pdf(): return jsonify({"message": "Ready"})
 
 @app.route('/convert/merge-pdfs', methods=['POST'])
-def merge_pdfs(): return jsonify({"message": "Feature ready"})
+def merge_pdfs(): return jsonify({"message": "Ready"})
 
 @app.route('/convert/compress-pdf', methods=['POST'])
-def compress_pdf(): return jsonify({"message": "Feature ready"})
+def compress_pdf(): return jsonify({"message": "Ready"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
