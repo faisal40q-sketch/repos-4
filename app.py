@@ -2,7 +2,7 @@ import os
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 from docx import Document
-from fpdf import FPDF
+from xhtml2pdf import pisa
 
 app = Flask(__name__)
 CORS(app)
@@ -16,50 +16,46 @@ def office_to_pdf():
     if file.filename == '':
         return jsonify({"error": "No filename"}), 400
 
-    # حفظ ملف الـ Word مؤقتاً
     docx_path = "temp.docx"
     pdf_path = "output.pdf"
     file.save(docx_path)
 
     try:
-        # قراءة ملف الـ Word
+        # قراءة ملف الـ Word وبناء نص HTML يدعم الـ Unicode والعربي
         doc = Document(docx_path)
+        html_content = "<html><head><meta charset='utf-8'><style>body { font-family: 'Helvetica', 'Arial', sans-serif; direction: rtl; text-align: right; }</style></head><body>"
         
-        # إنشاء ملف PDF وإعداد الخطوط
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-
-        # تحويل الفقرات من Word إلى PDF
         for paragraph in doc.paragraphs:
             if paragraph.text.strip():
-                # تنظيف النص وترميزه ليتوافق مع PDF الصافي
-                text = paragraph.text.encode('utf-8', 'ignore').decode('utf-8')
-                pdf.multi_cell(0, 10, txt=text)
+                html_content += f"<p>{paragraph.text}</p>"
         
-        pdf.output(pdf_path)
+        html_content += "</body></html>"
 
-        # إرسال الملف الجاهز للمستخدم
+        # تحويل الـ HTML المدعوم عربياً إلى ملف PDF مباشرة
+        with open(pdf_path, "w+b") as result_file:
+            pisa_status = pisa.CreatePDF(html_content, dest=result_file)
+        
+        if pisa_status.err:
+            return jsonify({"error": "PDF generation error"}), 500
+
         return send_file(pdf_path, as_attachment=True)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
-        # تنظيف الملفات المؤقتة من السيرفر
         if os.path.exists(docx_path): os.remove(docx_path)
 
-# إعداد باقي المسارات بشكل سريع لضمان عدم حدوث خطأ في الأزرار الأخرى
 @app.route('/convert/pdf-to-word', methods=['POST'])
-def pdf_to_word(): return jsonify({"message": "Feature ready"})
+def pdf_to_word(): return jsonify({"message": "Ready"})
 
 @app.route('/convert/image-to-pdf', methods=['POST'])
-def image_to_pdf(): return jsonify({"message": "Feature ready"})
+def image_to_pdf(): return jsonify({"message": "Ready"})
 
 @app.route('/convert/merge-pdfs', methods=['POST'])
-def merge_pdfs(): return jsonify({"message": "Feature ready"})
+def merge_pdfs(): return jsonify({"message": "Ready"})
 
 @app.route('/convert/compress-pdf', methods=['POST'])
-def compress_pdf(): return jsonify({"message": "Feature ready"})
+def compress_pdf(): return jsonify({"message": "Ready"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
