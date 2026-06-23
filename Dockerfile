@@ -1,9 +1,8 @@
 FROM python:3.11-slim
 
-# تثبيت حزم LibreOffice الأساسية والخطوط العربية لضمان جودة وتطابق التنسيق 100%
+# تثبيت حزم نظام لينكس الكاملة لـ LibreOffice لضمان التعرف على أمر soffice
 RUN apt-get update && apt-get install -y \
-    libreoffice-writer \
-    libreoffice-java-common \
+    libreoffice \
     fonts-kacst \
     fonts-liberation \
     fonts-dejavu \
