@@ -1,25 +1,27 @@
-# استخدام نسخة بايثون المستقرة والمدعومة
+## استخدام نسخة بايثون المستقرة والمدعومة
 FROM python:3.11-slim
 
-# تثبيت LibreOffice وحزم الخطوط الأساسية لدعم اللغة العربية
+# تثبيت LibreOffice والخطوط العربية لتجنب مشكلة المربعات أو الرموز الغريبة
 RUN apt-get update && apt-get install -y \
     libreoffice \
-    fonts-dejavu \
+    fonts-kacst \
     fonts-liberation \
-    ttf-mscorefonts-installer \
+    fonts-dejavu \
     && apt-get clean \
-    rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # تحديد مجلد العمل داخل السيرفر
 WORKDIR /app
 
-# نسخ ملف المكتبات وتثبيتها
+# نسخ ملف المكتبات أولاً لتسريع عملية البناء
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# نسخ باقي ملفات المشروع إلى السيرفر
+# نسخ باقي ملفات المشروع
 COPY . .
 
-# تحديد المنفذ وتشغيل السيرفر باستخدام gunicorn
-EXPOSE 5000
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+# المنفذ الافتراضي لـ Render
+EXPOSE 10000
+
+# أمر تشغيل السيرفر باستخدام gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]
