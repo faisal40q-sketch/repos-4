@@ -1,10 +1,12 @@
 FROM python:3.11-slim
 
-# تثبيت أداة wkhtmltopdf والخطوط العربية الأساسية في ثوانٍ بدون مشاكل
+# تثبيت حزم LibreOffice الأساسية والخطوط العربية لضمان جودة وتطابق التنسيق 100%
 RUN apt-get update && apt-get install -y \
-    wkhtmltopdf \
+    libreoffice-writer \
+    libreoffice-java-common \
     fonts-kacst \
     fonts-liberation \
+    fonts-dejavu \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
