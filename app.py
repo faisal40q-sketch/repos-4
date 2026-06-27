@@ -8,7 +8,7 @@ from pdf2docx import Converter
 app = Flask(__name__)
 CORS(app)
 
-# 1. تحويل Word إلى PDF (باستخدام محرك LibreOffice الحقيقي لضمان التنسيق 100%)
+# 1. تحويل Word إلى PDF (باستخدام المسار الصريح والمباشر لـ LibreOffice)
 @app.route('/convert/office-to-pdf', methods=['POST'])
 def office_to_pdf():
     if 'file' not in request.files:
@@ -21,30 +21,41 @@ def office_to_pdf():
     docx_path = "temp.docx"
     file.save(docx_path)
 
+    # تحديد المسارات المتوقعة لـ soffice في خوادم لينكس لضمان تشغيله حتماً
+    soffice_paths = [
+        '/usr/bin/soffice',
+        '/usr/lib/libreoffice/program/soffice',
+        'soffice' # كخيار أخير
+    ]
+    
+    chosen_path = None
+    for path in soffice_paths:
+        if os.path.exists(path) or path == 'soffice':
+            chosen_path = path
+            break
+
     try:
-        # أمر تشغيل المحرك لتحويل الملف فوراً وبنفس الأبعاد والزخارف والأشكال
+        # أمر التشغيل بالمسار المباشر والصريح
         cmd = [
-            'soffice',
+            chosen_path,
             '--headless',
             '--convert-to', 'pdf',
             docx_path
         ]
         
-        # تشغيل الأمر وانتظار انتهائه
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         
-        # اسم الملف الناتج التلقائي من المحرك
         pdf_path = "temp.pdf"
         
         if os.path.exists(pdf_path):
             return send_file(pdf_path, as_attachment=True, download_name="converted.pdf")
         else:
-            return jsonify({"error": f"Conversion failed: {result.stderr}"}), 500
+            # طباعة الخطأ بالتفصيل مع المسار المستخدم إذا فشل
+            return jsonify({"error": f"Conversion failed using {chosen_path}: {result.stderr}"}), 500
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
-        # تنظيف الملفات المؤقتة
         if os.path.exists(docx_path): os.remove(docx_path)
         if os.path.exists("temp.pdf"): os.remove("temp.pdf")
 
