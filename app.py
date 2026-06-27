@@ -6,7 +6,7 @@ import os
 import time
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins="*", allow_headers=["Content-Type"], methods=["GET", "POST", "OPTIONS"])
 
 API_KEY = os.environ.get("CLOUDCONVERT_API_KEY")
 
