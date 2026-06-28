@@ -4,6 +4,7 @@ import requests
 import tempfile
 import os
 import time
+import traceback
 
 app = Flask(__name__)
 CORS(app, origins="*", allow_headers=["Content-Type"], methods=["GET", "POST", "OPTIONS"])
@@ -20,12 +21,9 @@ def convert():
 
         headers = {"Authorization": f"Bearer {API_KEY}"}
 
-        # الخطوة ١: إنشاء Job
         job_data = {
             "tasks": {
-                "upload-file": {
-                    "operation": "import/upload"
-                },
+                "upload-file": {"operation": "import/upload"},
                 "convert-file": {
                     "operation": "convert",
                     "input": ["upload-file"],
@@ -45,47 +43,40 @@ def convert():
             json=job_data
         )
         job = job_response.json()
+        print("JOB:", job)
 
-        # الخطوة ٢: رفع الملف
         upload_task = next(t for t in job["data"]["tasks"] if t["name"] == "upload-file")
         upload_url = upload_task["result"]["form"]["url"]
         upload_params = upload_task["result"]["form"]["parameters"]
-        
-        file_content = file.read()
-        files_dict = {"file": (filename, file_content)}
-        requests.post(upload_url, data=upload_params, files=files_dict)
 
-        # الخطوة ٣: انتظار التحويل
+        file_content = file.read()
+        requests.post(upload_url, data=upload_params, files={"file": (filename, file_content)})
+
         job_id = job["data"]["id"]
         for _ in range(30):
             time.sleep(2)
-            status_response = requests.get(
-                f"https://api.cloudconvert.com/v2/jobs/{job_id}",
-                headers=headers
-            )
-            status = status_response.json()
+            status = requests.get(f"https://api.cloudconvert.com/v2/jobs/{job_id}", headers=headers).json()
+            print("STATUS:", status["data"]["status"])
             if status["data"]["status"] == "finished":
                 break
             if status["data"]["status"] == "error":
                 return jsonify({"error": "Conversion failed"}), 500
 
-        # الخطوة ٤: تحميل الملف
         export_task = next(t for t in status["data"]["tasks"] if t["name"] == "export-file")
         download_url = export_task["result"]["files"][0]["url"]
         output_filename = export_task["result"]["files"][0]["filename"]
 
         file_response = requests.get(download_url)
-        
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{target_format}")
         tmp.write(file_response.content)
         tmp.close()
 
         return send_file(tmp.name, as_attachment=True, download_name=output_filename)
 
-  except Exception as e:
-    import traceback
-    print(traceback.format_exc())
-    return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "running"})
