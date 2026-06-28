@@ -18,50 +18,64 @@ def convert():
         filename = file.filename
         source_format = filename.rsplit(".", 1)[-1].lower()
 
-        headers = {
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json"
-        }
+        headers = {"Authorization": f"Bearer {API_KEY}"}
 
         # الخطوة ١: إنشاء Job
-        job = requests.post("https://api.cloudconvert.com/v2/jobs", headers=headers, json={
+        job_data = {
             "tasks": {
-                "upload-file": {"operation": "import/upload"},
+                "upload-file": {
+                    "operation": "import/upload"
+                },
                 "convert-file": {
                     "operation": "convert",
-                    "input": "upload-file",
+                    "input": ["upload-file"],
                     "input_format": source_format,
-                    "output_format": target_format,
-                    "engine": "office" if source_format in ["docx","doc","pptx","xlsx"] else None
+                    "output_format": target_format
                 },
                 "export-file": {
                     "operation": "export/url",
-                    "input": "convert-file"
+                    "input": ["convert-file"]
                 }
             }
-        }).json()
+        }
+
+        job_response = requests.post(
+            "https://api.cloudconvert.com/v2/jobs",
+            headers={**headers, "Content-Type": "application/json"},
+            json=job_data
+        )
+        job = job_response.json()
 
         # الخطوة ٢: رفع الملف
-        upload_task = job["data"]["tasks"][0]
+        upload_task = next(t for t in job["data"]["tasks"] if t["name"] == "upload-file")
         upload_url = upload_task["result"]["form"]["url"]
         upload_params = upload_task["result"]["form"]["parameters"]
-        files_data = {**upload_params, "file": (filename, file.stream, file.content_type)}
-        requests.post(upload_url, files=files_data)
+        
+        file_content = file.read()
+        files_dict = {"file": (filename, file_content)}
+        requests.post(upload_url, data=upload_params, files=files_dict)
 
         # الخطوة ٣: انتظار التحويل
         job_id = job["data"]["id"]
         for _ in range(30):
             time.sleep(2)
-            status = requests.get(f"https://api.cloudconvert.com/v2/jobs/{job_id}", headers=headers).json()
+            status_response = requests.get(
+                f"https://api.cloudconvert.com/v2/jobs/{job_id}",
+                headers=headers
+            )
+            status = status_response.json()
             if status["data"]["status"] == "finished":
                 break
+            if status["data"]["status"] == "error":
+                return jsonify({"error": "Conversion failed"}), 500
 
         # الخطوة ٤: تحميل الملف
-        export_task = [t for t in status["data"]["tasks"] if t["name"] == "export-file"][0]
+        export_task = next(t for t in status["data"]["tasks"] if t["name"] == "export-file")
         download_url = export_task["result"]["files"][0]["url"]
         output_filename = export_task["result"]["files"][0]["filename"]
 
         file_response = requests.get(download_url)
+        
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{target_format}")
         tmp.write(file_response.content)
         tmp.close()
