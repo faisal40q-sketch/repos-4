@@ -82,9 +82,10 @@ def convert():
 
         return send_file(tmp.name, as_attachment=True, download_name=output_filename)
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
+  except Exception as e:
+    import traceback
+    print(traceback.format_exc())
+    return jsonify({"error": str(e)}), 500
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "running"})
